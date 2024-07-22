@@ -1,0 +1,11 @@
+# Ignore sensative files.
+*.env
+!sample.env
+
+# Ignore dependencies.
+.bundle/
+node_modules/
+vendor/
+
+# Ignore build artificats.
+*.zip
