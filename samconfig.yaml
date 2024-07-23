@@ -1,0 +1,46 @@
+version: 0.1
+prod:
+  deploy:
+    parameters:
+      stack_name: document-transfer-lambda
+      resolve_s3: true
+      s3_prefix: document-transfer-lambda
+      region: us-east-1
+      confirm_changeset: true
+      capabilities: CAPABILITY_IAM
+      disable_rollback: true
+      parameter_overrides: BucketNames="get-child-care-illinois-production"
+        VpcId="vpc-034f6f582cb62535f"
+        VpcCIDR="10.0.24.0/22"
+        Subnets="subnet-01ea7634ed726dfc3,subnet-03591e096e32ebd2f,subnet-07fb5fe13fc75c576"
+        OneDriveFolder="4c-ccap-apps"
+        TransferUrl="https://illinois.document-transfer.cfa.codes"
+        Environment="production"
+        LogLevel="debug"
+      image_repositories: []
+      tags:
+        - environment=production
+        - project=illinois-getchildcare
+        - service=document-transfer
+staging:
+  deploy:
+    parameters:
+      stack_name: document-transfer-lambda
+      resolve_s3: true
+      s3_prefix: document-transfer-lambda
+      region: us-east-1
+      confirm_changeset: true
+      capabilities: CAPABILITY_IAM
+      disable_rollback: true
+      parameter_overrides: BucketNames="jarmes-lambda-test,get-child-care-illinois-staging"
+        VpcId="vpc-0c4c542a315b431d2"
+        VpcCIDR="10.0.24.0/22"
+        Subnets="subnet-07da01fd14c162f79,subnet-02d9a8f3d11eef94a,subnet-0189f0a7ed9c8b1c0"
+        OneDriveFolder="4c-ccap-apps-testing"
+        TransferUrl="https://staging.document-transfer.cfa.codes"
+        Environment="staging"
+      image_repositories: []
+      tags:
+        - environment=staging
+        - project=illinois-getchildcare
+        - service=document-transfer

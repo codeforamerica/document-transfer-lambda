@@ -1,0 +1,148 @@
+# This AWS SAM template has been generated from your function's configuration. If
+# your function has one or more triggers, note that the AWS resources associated
+# with these triggers aren't fully specified in this template and include
+# placeholder values. Open this template in AWS Application Composer or your
+# favorite IDE and modify it to specify a serverless application with other AWS
+# resources.
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: An AWS Serverless Application Model template describing your function.
+
+Parameters:
+  BucketNames:
+    Type: List<String>
+    Description: List of S3 bucket names to deploy the function in
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Id of the VPC to deploy the function in
+  VpcCIDR:
+    Type: String
+    Description: CIDR block of the VPC
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of subnets to deploy the function in
+  OneDriveFolder:
+    Type: String
+    Description: OneDrive folder to upload files to
+  TransferUrl:
+    Type: String
+    Description: URL for the document transfer service
+  Environment:
+    Type: String
+    Description: Name of the current environment
+    Default: 'development'
+  LogLevel:
+    Type: String
+    Description: Log level for the function
+    Default: info
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: document-transfer lambda network access
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow egress on 443
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+        - CidrIp: !Ref VpcCIDR
+          Description: Allow egress to the VPC
+          IpProtocol: -1
+  SecretKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Key for encrypting credentials for the document transfer service
+      KeyPolicy:
+        Version: '2012-10-17'
+#        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+  CredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Credentials for the document transfer service
+      KmsKeyId: !Ref SecretKey
+      Name: !Sub illinois-getchildcare/${Environment}/document-transfer/consumer-ish
+  documenttransfer:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Description: ''
+      MemorySize: 512
+      Timeout: 300
+      Handler: functions/document_transfer.lambda_handler
+      Runtime: ruby3.3
+      Architectures:
+        - x86_64
+      EphemeralStorage:
+        Size: 512
+      Environment:
+        Variables:
+          CREDENTIALS_ARN: !Ref CredentialsSecret
+          LOG_LEVEL: !Ref LogLevel
+          ONEDRIVE_FOLDER: !Ref OneDriveFolder
+          TRANSFER_URL: !Ref TransferUrl
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 21600
+        MaximumRetryAttempts: 2
+      PackageType: Zip
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+              Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*
+            - Effect: Allow
+              Action:
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:*
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectAttributes
+                - s3:GetObjectTagging
+                - s3:GetObjectVersion
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+                - secretsmanager:GetSecretValue
+                - secretsmanager:DescribeSecret
+              Resource:
+                - !GetAtt SecretKey.Arn
+                - !Ref CredentialsSecret
+      SnapStart:
+        ApplyOn: None
+      Tags:
+        env: staging
+        environment: staging
+        project: illinois-getchildcare
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SecurityGroup
+        SubnetIds: !Ref Subnets
+        Ipv6AllowedForDualStack: false
+      Events:
+        EventBridgeRule1:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - Object Created
+              detail:
+                bucket:
+                  name: !Ref BucketNames
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
